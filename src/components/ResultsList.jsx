@@ -17,7 +17,7 @@ export default function ResultsList({ results }) {
             <h2 className="font-semibold text-neutral-800 dark:text-neutral-200">
               {board.label}
             </h2>
-            <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+            <span className="rounded-full border border-emerald-500/20 bg-emerald-50 px-2.5 py-0.5 font-mono text-xs font-medium text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-300">
               {board.count}
             </span>
           </header>
