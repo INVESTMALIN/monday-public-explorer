@@ -8,12 +8,13 @@ Notice destinée aux développeurs externes (équipe Invest Malin, prestataires)
 
 ## 1. TL;DR
 
-- Une base **Postgres Railway** expose un schéma `monday_public` contenant **6 vues matérialisées** miroir des boards Monday d'Invest Malin.
+- Une base **Postgres Railway** expose un schéma `monday_public` contenant **6 vues matérialisées** miroir des boards Monday d'Invest Malin, plus une **vue `updates`** qui miroite les updates textuelles (commentaires) de tous les items.
 - Accès **read-only** via une paire user/password fournie par Loïc (1 paire par application).
 - Connexion standard Postgres + SSL requis : `postgresql://<user>:<pwd>@maglev.proxy.rlwy.net:31175/railway?sslmode=require`.
 - Données rafraîchies **automatiquement chaque nuit à 3h UTC**. Aucune action manuelle requise côté client.
 - Toutes les colonnes Monday sont stockées en `text`. Pour filtrer/trier sur date ou nombre, **caster explicitement** (`::date`, `::numeric`) avec `NULLIF(col, '')` pour gérer les lignes vides.
 - Limites : `statement_timeout = 30s`, max 10 connexions simultanées par user, schéma `monday_public` uniquement (le reste de la DB est invisible).
+
 
 ---
 
@@ -73,6 +74,68 @@ FROM information_schema.columns
 WHERE table_schema = 'monday_public'
   AND table_name = 'mv_clients_proprietaires'
 ORDER BY ordinal_position;
+```
+
+### Vue `updates` (commentaires textuels Monday)
+
+En plus des 6 vues d'items, une vue `monday_public.updates` miroite tous les **updates textuels** (les commentaires que les utilisateurs Monday postent sur les items, anciennement appelés "bulles" dans l'UI Monday). Volumétrie : ~155 000 updates au 07/05/2026, croissance continue.
+
+Synchro incrémentale via horodatage des modifs (mise à jour plus fréquente que les vues matérialisées d'items, pas de full sync nocturne).
+
+| Colonne             | Type          | Description                                          |
+|---------------------|---------------|------------------------------------------------------|
+| `update_id`         | `bigint`      | Id Monday de l'update                                |
+| `board_id`          | `bigint`      | Id du board parent                                   |
+| `item_id`           | `bigint`      | Id de l'item parent (joignable aux 6 vues mv_*)      |
+| `parent_update_id`  | `bigint`      | Id de l'update parent si c'est une réponse (thread). NULL pour les updates racine. |
+| `body_text`         | `text`        | Contenu textuel de l'update                          |
+| `creator_id`        | `bigint`      | Id Monday de l'auteur                                |
+| `creator_name`      | `text`        | Nom de l'auteur (ex "Olga CARDIN")                   |
+| `creator_email`     | `text`        | Email de l'auteur                                    |
+| `monday_created_at` | `timestamptz` | Date de création de l'update                         |
+| `monday_updated_at` | `timestamptz` | Date de dernière modification de l'update            |
+
+**Toutes les colonnes sont typées nativement** (pas de cast à faire, contrairement aux vues d'items).
+
+**Cas d'usage typiques** :
+
+```sql
+-- 1. Toutes les updates d'un item donné, ordre chronologique
+SELECT update_id, creator_name, body_text, monday_created_at
+FROM monday_public.updates
+WHERE item_id = 1625079121
+ORDER BY monday_created_at;
+
+-- 2. Updates récentes contenant un mot-clé (ex: "matching")
+SELECT u.update_id, u.creator_name, u.body_text, u.monday_created_at,
+       u.item_id
+FROM monday_public.updates u
+WHERE u.body_text ILIKE '%matching%'
+  AND u.monday_created_at >= NOW() - INTERVAL '7 days'
+ORDER BY u.monday_created_at DESC
+LIMIT 50;
+
+-- 3. JOIN avec une vue d'items pour enrichir avec le nom du prospect
+SELECT u.creator_name, u.body_text, u.monday_created_at,
+       v.item_name AS prospect_name, v.group_title
+FROM monday_public.updates u
+JOIN monday_public.mv_ventes_conciergeries v ON v.item_id = u.item_id
+WHERE u.body_text ILIKE '%matching%'
+ORDER BY u.monday_created_at DESC
+LIMIT 100;
+
+-- 4. Updates postées par un auteur spécifique
+SELECT update_id, item_id, body_text, monday_created_at
+FROM monday_public.updates
+WHERE creator_email = 'olga@loic-cardin.com'
+  AND monday_created_at >= NOW() - INTERVAL '30 days'
+ORDER BY monday_created_at DESC;
+
+-- 5. Threads : retrouver toutes les réponses d'une update racine
+SELECT update_id, creator_name, body_text, monday_created_at
+FROM monday_public.updates
+WHERE parent_update_id = 325371703
+ORDER BY monday_created_at;
 ```
 
 ---
@@ -241,6 +304,7 @@ Si tu es un agent IA (Claude, GPT, etc.) qui aide un dev à coder son intégrati
 5. **Read-only strict** : ne génère JAMAIS de `INSERT`, `UPDATE`, `DELETE`, `CREATE`, `REFRESH`, etc. Ils échoueront.
 6. **`statement_timeout = 30s`** : si une requête est lente, propose des index logiques (filtres sur `item_id`, `monday_updated_at`, `group_title`) plutôt qu'un cron côté client.
 7. **Pas de schéma autre que `monday_public`** : ne tente pas `pg_catalog`-only stuff sur d'autres tables, elles sont invisibles.
+8. **Vue `updates` séparée** : les commentaires Monday sont dans `monday_public.updates` (pas dans les vues `mv_*`). Joindre sur `item_id` pour enrichir. Toutes les colonnes sont typées nativement (pas de cast `NULLIF` nécessaire). Filtrer sur `body_text ILIKE '%terme%'` pour la recherche full-text simple.
 
 ### Exemple Node.js (`pg`)
 
