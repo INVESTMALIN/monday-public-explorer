@@ -28,7 +28,7 @@ export default function SearchBar({ onDebouncedChange, loading = false }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="Rechercher un nom, un email, un numéro de bien..."
-        className="h-12 w-full rounded-lg border border-neutral-200 bg-white pl-12 pr-4 text-base text-neutral-900 shadow-sm transition-colors placeholder:text-neutral-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/30"
+        className="h-12 w-full rounded-lg border border-neutral-200 bg-white pl-12 pr-4 text-base text-neutral-900 transition-colors placeholder:text-neutral-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-white/10 dark:bg-neutral-900 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/30"
       />
     </div>
   );
