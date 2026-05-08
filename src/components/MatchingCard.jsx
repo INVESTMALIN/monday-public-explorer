@@ -1,17 +1,16 @@
 import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { relativeDate } from '../lib/dateUtils.js';
 
-const MATCHING_MARKER = 'Suggestion de contenu:';
 const PREVIEW_LENGTH = 200;
 
 // Le matching_text envoyé par l'API commence par "Suggestion de contenu:".
 // Pour la preview tronquée on retire ce préambule afin de montrer du contenu utile.
+// Case-insensitive pour rester aligné avec l'extraction serveur (regex /i) et
+// le filtre SQL (ILIKE) ; sinon une casse exotique du marker laisserait le
+// préambule visible dans la preview.
 function getPreview(text) {
   if (!text) return '';
-  let stripped = text;
-  if (stripped.startsWith(MATCHING_MARKER)) {
-    stripped = stripped.slice(MATCHING_MARKER.length);
-  }
+  let stripped = text.replace(/^Suggestion de contenu:\s*/i, '');
   stripped = stripped.trim();
   if (stripped.length <= PREVIEW_LENGTH) return stripped;
   return stripped.slice(0, PREVIEW_LENGTH).trim() + '…';
