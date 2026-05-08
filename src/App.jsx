@@ -4,6 +4,7 @@ import Layout from './components/Layout.jsx';
 import Annuaire from './pages/Annuaire.jsx';
 import ComingSoon from './pages/ComingSoon.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import Matching from './pages/Matching.jsx';
 
 export default function App() {
   return (
@@ -13,15 +14,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/annuaire" element={<Annuaire />} />
-            <Route
-              path="/matching"
-              element={
-                <ComingSoon
-                  title="Matching"
-                  description="Croisement automatique entre boards (clients ↔ livraisons, prospects ↔ ventes, etc.)."
-                />
-              }
-            />
+            <Route path="/matching" element={<Matching />} />
             <Route
               path="/api-docs"
               element={
