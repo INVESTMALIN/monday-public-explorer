@@ -58,6 +58,12 @@ function buildMondayUrl(itemId) {
   return `https://invest-malin.monday.com/boards/${VENTES_BOARD_ID}/pulses/${itemId}`;
 }
 
+// Échappe les wildcards ILIKE (\, %, _) pour que la recherche utilisateur soit
+// traitée comme du texte littéral. À utiliser avec ESCAPE '\' côté SQL.
+function escapeIlikePattern(input) {
+  return input.replace(/[\\%_]/g, '\\$&');
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
@@ -75,8 +81,10 @@ export default async function handler(req, res) {
   const q = (req.query?.q ?? '').toString().trim();
   // ILIKE '%%' matches everything, donc pas besoin d'une branche conditionnelle
   // côté SQL : on passe '%%' quand pas de recherche. Le filtre 'Suggestion de
-  // contenu:' garantit déjà qu'on ne renvoie que des matchings.
-  const searchPattern = q ? `%${q}%` : '%%';
+  // contenu:' garantit déjà qu'on ne renvoie que des matchings. Quand q est
+  // fourni, on échappe les wildcards pour que '100%' ou 'foo_bar' soit traité
+  // littéralement (couplé à ESCAPE '\' dans la requête).
+  const searchPattern = q ? `%${escapeIlikePattern(q)}%` : '%%';
 
   try {
     const pool = getPool();
@@ -94,7 +102,7 @@ export default async function handler(req, res) {
        WHERE u.board_id = $1
          AND u.body_text ILIKE $2
          AND u.monday_created_at >= NOW() - $3::interval
-         AND u.body_text ILIKE $4
+         AND u.body_text ILIKE $4 ESCAPE '\'
        ORDER BY u.monday_created_at DESC
        LIMIT ${RESULT_LIMIT}`,
       [VENTES_BOARD_ID, `%${MATCHING_MARKER}%`, intervalStr, searchPattern]
