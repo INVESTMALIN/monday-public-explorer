@@ -45,9 +45,13 @@ function getPool() {
 
 function extractMatchingText(bodyText) {
   if (!bodyText) return '';
-  const idx = bodyText.indexOf(MATCHING_MARKER);
-  if (idx < 0) return bodyText;
-  return bodyText.slice(idx);
+  // Case-insensitive pour rester aligné avec le filtre SQL (ILIKE).
+  // Sinon une update avec une casse exotique du marker (ex: SUGGESTION DE
+  // CONTENU:) passe le filtre SQL mais rate l'extraction, et on renvoie
+  // l'analyse CRM complète au lieu du seul matching.
+  const match = bodyText.match(/Suggestion de contenu:/i);
+  if (!match) return bodyText;
+  return bodyText.slice(match.index);
 }
 
 function buildMondayUrl(itemId) {
